@@ -1,0 +1,32 @@
+// Placeholder: src/middleware.ts
+export { default } from 'next-auth/middleware';
+
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/employees/:path*',
+    '/clients/:path*',
+    '/invoices/:path*',
+    '/meetings/:path*',
+    '/tasks/:path*',
+    '/finances/:path*',
+    '/change-password',
+    '/profile/:path*',
+    '/tickets/:path*',
+    '/attendance/:path*',
+    '/api/employees/:path*',
+    '/api/clients/:path*',
+    '/api/invoices/:path*',
+    '/api/meetings/:path*',
+    '/api/tasks/:path*',
+    '/api/subtasks/:path*',
+    '/api/expenses/:path*',
+    '/api/send-email/:path*',
+    '/api/auth/change-password',
+    '/api/profile/:path*',
+    '/api/tickets/:path*',
+    '/api/offer-letter/:path*',
+    '/api/salary-slip/:path*',
+    '/api/attendance/:path*',
+  ],
+};

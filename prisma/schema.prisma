@@ -1,0 +1,275 @@
+// Placeholder: prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FOUNDER
+  MANAGER
+  EMPLOYEE
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+  PARTIAL
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum ExpenseCategory {
+  SALARY
+  RENT
+  UTILITIES
+  SOFTWARE
+  MARKETING
+  TRAVEL
+  OFFICE_SUPPLIES
+  PROFESSIONAL_FEES
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum AttendanceStatus {
+  ON_TIME
+  LATE
+  ABSENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  employeeId   String   @unique
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(EMPLOYEE)
+  managerId    String?
+  manager      User?    @relation("ManagerToEmployee", fields: [managerId], references: [id])
+  reports      User[]   @relation("ManagerToEmployee")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  // Forces the "change password" screen on first login (set true whenever a
+  // Founder/Manager creates the account with a temporary password).
+  mustChangePassword Boolean @default(true)
+
+  // Employment details used to generate the offer letter PDF. Set by
+  // whoever created the account; the employee themselves cannot edit these.
+  designation  String?
+  salary       Decimal?
+  joiningDate  DateTime?
+
+  clients      Client[]
+  invoices     Invoice[]
+  meetings     Meeting[]
+
+  tasksGiven      Task[]    @relation("TaskAssignedBy")
+  tasksReceived   Task[]    @relation("TaskAssignedTo")
+  subtasksGiven   SubTask[] @relation("SubTaskAssignedBy")
+  subtasksReceived SubTask[] @relation("SubTaskAssignedTo")
+  expenses        Expense[]
+  passwordResetTokens PasswordResetToken[]
+  profile         Profile?
+  ticketsRaised   Ticket[] @relation("TicketRaisedBy")
+  ticketsHandled  Ticket[] @relation("TicketHandledBy")
+  attendanceDays  AttendanceDay[]
+  activityPings   ActivityPing[]
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  gstin     String?
+  email     String?
+  phone     String?
+  address   String?
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id])
+  invoices  Invoice[]
+  meetings  Meeting[]
+  createdAt DateTime  @default(now())
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  invoiceNo   String        @unique
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id])
+  raisedById  String
+  raisedBy    User          @relation(fields: [raisedById], references: [id])
+  description String?
+  amount      Decimal
+  gstRate     Decimal       @default(18)
+  gstAmount   Decimal
+  cgstAmount  Decimal       @default(0)
+  sgstAmount  Decimal       @default(0)
+  igstAmount  Decimal       @default(0)
+  interState  Boolean       @default(false)
+  sacCode     String        @default("998314")
+  natureOfSupply String     @default("B2B")
+  placeOfSupply  String?
+  totalAmount Decimal
+  status      PaymentStatus @default(PENDING)
+  dueDate     DateTime
+  paidDate    DateTime?
+  paidAmount  Decimal       @default(0)
+  reminderSentAt DateTime?
+  // Unguessable token so clients can view/download the invoice without logging in.
+  publicToken String        @unique @default(cuid())
+  createdAt   DateTime      @default(now())
+}
+
+model Meeting {
+  id             String    @id @default(cuid())
+  title          String
+  clientId       String?
+  client         Client?   @relation(fields: [clientId], references: [id])
+  hostId         String
+  host           User      @relation(fields: [hostId], references: [id])
+  scheduledAt    DateTime
+  notes          String?
+  meetingLink    String?
+  reminderSentAt DateTime?
+  createdAt      DateTime  @default(now())
+}
+
+// A Task is handed down from a Founder to a Manager.
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus @default(PENDING)
+  dueDate      DateTime?
+  assignedById String
+  assignedBy   User       @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+  assignedToId String
+  assignedTo   User       @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  subtasks     SubTask[]
+  completedAt  DateTime?
+  reminderSentAt DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// A SubTask is handed down from a Manager to an Employee, under a parent Task.
+model SubTask {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus @default(PENDING)
+  dueDate      DateTime?
+  taskId       String
+  task         Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedById String
+  assignedBy   User       @relation("SubTaskAssignedBy", fields: [assignedById], references: [id])
+  assignedToId String
+  assignedTo   User       @relation("SubTaskAssignedTo", fields: [assignedToId], references: [id])
+  completedAt  DateTime?
+  reminderSentAt DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// Company expenses, logged by Founders, used for the finances/expense tracker.
+model Expense {
+  id          String          @id @default(cuid())
+  title       String
+  category    ExpenseCategory @default(OTHER)
+  amount      Decimal
+  expenseDate DateTime
+  notes       String?
+  addedById   String
+  addedBy     User            @relation(fields: [addedById], references: [id])
+  createdAt   DateTime        @default(now())
+}
+
+// Single-use, expiring tokens for the "forgot password" flow.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Personal details every user fills in about themselves — separate from
+// employment/role data, which only Founders/Managers control.
+model Profile {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone                 String?
+  address               String?
+  dateOfBirth           DateTime?
+  bio                   String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  completedAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime  @default(now())
+}
+
+// Support tickets — any user can raise one; Founders (and Managers, for
+// their own reports) triage and resolve them.
+model Ticket {
+  id           String       @id @default(cuid())
+  title        String
+  description  String
+  status       TicketStatus @default(OPEN)
+  raisedById   String
+  raisedBy     User         @relation("TicketRaisedBy", fields: [raisedById], references: [id])
+  handledById  String?
+  handledBy    User?        @relation("TicketHandledBy", fields: [handledById], references: [id])
+  response     String?
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+// One row per employee per calendar day — clock-in/out, break, and computed status.
+model AttendanceDay {
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id])
+  date              DateTime          // stored at midnight local time — one row per user per day
+  clockInAt         DateTime?
+  clockOutAt        DateTime?
+  breakStartAt      DateTime?
+  breakEndAt        DateTime?
+  totalBreakSeconds Int               @default(0)
+  status            AttendanceStatus?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([userId, date])
+}
+
+// Heartbeat pings sent by the browser while the employee is actively using
+// the mouse/keyboard. Gaps between pings longer than the idle threshold are
+// treated as "missing" activity for that stretch of the shift.
+model ActivityPing {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  timestamp DateTime @default(now())
+
+  @@index([userId, timestamp])
+}
