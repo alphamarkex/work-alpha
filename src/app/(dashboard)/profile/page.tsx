@@ -95,9 +95,22 @@ export default async function ProfilePage() {
             bio: profile?.bio,
             emergencyContactName: profile?.emergencyContactName,
             emergencyContactPhone: profile?.emergencyContactPhone,
+            aadharNumber: profile?.aadharNumber,
+            hasIdDocument: Boolean(profile?.idDocumentName),
+            idDocumentName: profile?.idDocumentName,
           }}
           mode="edit"
         />
+        {profile?.idDocumentName && (
+          <a
+            href={`/api/profile/document?userId=${user.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-block text-sm font-medium text-brand-600 hover:text-brand-700"
+          >
+            View uploaded ID document
+          </a>
+        )}
       </div>
     </div>
   );

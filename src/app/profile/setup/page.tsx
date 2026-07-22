@@ -23,8 +23,9 @@ export default async function ProfileSetupPage() {
       <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-1 text-xl font-semibold text-gray-900">Welcome, {session.user.name.split(' ')[0]}</h1>
         <p className="mb-6 text-sm text-gray-500">
-          Before you get started, tell us a bit about yourself. Your role and employment details
-          are set by your workspace admin and aren't editable here.
+          Before you get started, tell us a bit about yourself and upload a copy of your Aadhaar
+          card (or other government ID) for our records. Your role and employment details are set
+          by your workspace admin and aren't editable here.
         </p>
         <ProfileForm
           initial={{
@@ -34,6 +35,9 @@ export default async function ProfileSetupPage() {
             bio: profile?.bio,
             emergencyContactName: profile?.emergencyContactName,
             emergencyContactPhone: profile?.emergencyContactPhone,
+            aadharNumber: profile?.aadharNumber,
+            hasIdDocument: Boolean(profile?.idDocumentName),
+            idDocumentName: profile?.idDocumentName,
           }}
           mode="setup"
         />

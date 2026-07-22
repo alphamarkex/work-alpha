@@ -20,12 +20,13 @@ export default async function TasksPage() {
           ],
         };
 
-  const [tasks, managers, allActiveUsers] = await Promise.all([
+  const [tasks, managers, allActiveUsers, clients] = await Promise.all([
     prisma.task.findMany({
       where: taskWhere,
       include: {
         assignedBy: { select: { id: true, name: true } },
         assignedTo: { select: { id: true, name: true } },
+        client: { select: { id: true, name: true } },
         subtasks: {
           include: {
             assignedBy: { select: { id: true, name: true } },
@@ -50,12 +51,41 @@ export default async function TasksPage() {
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
+    user.role === 'FOUNDER'
+      ? prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+      : Promise.resolve([]),
   ]);
 
   const intro =
     user.role === 'FOUNDER'
       ? 'Hand tasks down to your Managers. Anyone holding a task or sub-task can delegate pieces of it to any teammate.'
       : 'Tasks and sub-tasks you hold or have delegated. Anyone holding a task can pass pieces of it to any teammate.';
+
+  // Flattened "who's doing what, for which brand" rows — Founder-only view.
+  const workRows =
+    user.role === 'FOUNDER'
+      ? tasks.flatMap((task) => {
+          const rows = [
+            {
+              key: task.id,
+              person: task.assignedTo.name,
+              work: task.title,
+              brand: task.client?.name ?? '— internal —',
+              status: task.status,
+            },
+          ];
+          for (const sub of task.subtasks) {
+            rows.push({
+              key: sub.id,
+              person: sub.assignedTo.name,
+              work: `${sub.title} (under "${task.title}")`,
+              brand: task.client?.name ?? '— internal —',
+              status: sub.status,
+            });
+          }
+          return rows;
+        })
+      : [];
 
   return (
     <div className="space-y-6">
@@ -64,7 +94,35 @@ export default async function TasksPage() {
         <p className="text-sm text-gray-500">{intro}</p>
       </div>
 
-      {user.role === 'FOUNDER' && <TaskForm managers={managers} />}
+      {user.role === 'FOUNDER' && <TaskForm managers={managers} clients={clients} />}
+
+      {user.role === 'FOUNDER' && workRows.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-gray-900">Who's doing what, for which brand</h2>
+          </div>
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Team member</th>
+                <th className="px-4 py-3">Work</th>
+                <th className="px-4 py-3">Brand / client</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {workRows.map((row) => (
+                <tr key={row.key}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{row.person}</td>
+                  <td className="px-4 py-3 text-gray-600">{row.work}</td>
+                  <td className="px-4 py-3 text-gray-500">{row.brand}</td>
+                  <td className="px-4 py-3 text-gray-500">{row.status.replace('_', ' ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {tasks.length === 0 && (
         <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500 shadow-sm">
@@ -89,6 +147,7 @@ export default async function TasksPage() {
                   )}
                   <p className="mt-2 text-xs text-gray-400">
                     {task.assignedBy.name} → {task.assignedTo.name}
+                    {task.client && ` · Brand: ${task.client.name}`}
                     {task.dueDate &&
                       ` · Due ${task.dueDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })}`}
                   </p>

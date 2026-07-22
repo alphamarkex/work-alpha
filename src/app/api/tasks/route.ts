@@ -11,6 +11,7 @@ const createTaskSchema = z.object({
   description: z.string().optional().nullable(),
   assignedToId: z.string().min(1),
   dueDate: z.string().optional().nullable(), // ISO date string
+  clientId: z.string().optional().nullable(),
 });
 
 const updateTaskSchema = z.object({
@@ -43,6 +44,7 @@ export async function GET() {
     include: {
       assignedBy: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true } },
       subtasks: {
         include: {
           assignedBy: { select: { id: true, name: true } },
@@ -88,10 +90,12 @@ export async function POST(req: NextRequest) {
       assignedById: session.user.id,
       assignedToId: data.assignedToId,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      clientId: data.clientId || null,
     },
     include: {
       assignedBy: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true, email: true } },
+      client: { select: { id: true, name: true } },
     },
   });
 

@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+// Base64 data URLs bloat fast — cap the raw upload around ~4MB before encoding.
+const MAX_DOCUMENT_BASE64_LENGTH = 6_000_000;
+
 const profileSchema = z.object({
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
@@ -11,6 +14,14 @@ const profileSchema = z.object({
   bio: z.string().optional().nullable(),
   emergencyContactName: z.string().optional().nullable(),
   emergencyContactPhone: z.string().optional().nullable(),
+  aadharNumber: z.string().optional().nullable(),
+  idDocumentData: z
+    .string()
+    .max(MAX_DOCUMENT_BASE64_LENGTH, 'File is too large — please upload something under ~4MB')
+    .optional()
+    .nullable(),
+  idDocumentName: z.string().optional().nullable(),
+  idDocumentMimeType: z.string().optional().nullable(),
   markComplete: z.boolean().optional(),
 });
 
@@ -20,8 +31,29 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const profile = await prisma.profile.findUnique({ where: { userId: session.user.id } });
-  return NextResponse.json({ profile });
+  // Don't ship the (potentially multi-MB) document blob on every profile
+  // fetch — just note whether one exists. The actual file is fetched
+  // separately via /api/profile/document only when someone clicks to view it.
+  const profile = await prisma.profile.findUnique({
+    where: { userId: session.user.id },
+    select: {
+      id: true,
+      phone: true,
+      address: true,
+      dateOfBirth: true,
+      bio: true,
+      emergencyContactName: true,
+      emergencyContactPhone: true,
+      aadharNumber: true,
+      idDocumentName: true,
+      idDocumentMimeType: true,
+      completedAt: true,
+    },
+  });
+
+  return NextResponse.json({
+    profile: profile ? { ...profile, hasIdDocument: Boolean(profile.idDocumentName) } : null,
+  });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -38,9 +70,23 @@ export async function PATCH(req: NextRequest) {
 
   const data = parsed.data;
 
+  if (data.markComplete) {
+    const existing = await prisma.profile.findUnique({
+      where: { userId: session.user.id },
+      select: { idDocumentName: true },
+    });
+    const willHaveDocument = Boolean(data.idDocumentData) || Boolean(existing?.idDocumentName);
+    if (!willHaveDocument) {
+      return NextResponse.json(
+        { error: 'Please upload a copy of your Aadhaar card (or other ID) to finish setup.' },
+        { status: 400 }
+      );
+    }
+  }
+
   // Note: this route only ever touches personal fields (phone, address, DOB,
-  // bio, emergency contact). Role, designation, salary, and joiningDate live
-  // on the User model and are never writable from here.
+  // bio, emergency contact, Aadhaar/KYC). Role, designation, salary, and
+  // joiningDate live on the User model and are never writable from here.
   const profile = await prisma.profile.upsert({
     where: { userId: session.user.id },
     create: {
@@ -51,6 +97,10 @@ export async function PATCH(req: NextRequest) {
       bio: data.bio ?? null,
       emergencyContactName: data.emergencyContactName ?? null,
       emergencyContactPhone: data.emergencyContactPhone ?? null,
+      aadharNumber: data.aadharNumber ?? null,
+      idDocumentData: data.idDocumentData ?? null,
+      idDocumentName: data.idDocumentName ?? null,
+      idDocumentMimeType: data.idDocumentMimeType ?? null,
       completedAt: data.markComplete ? new Date() : null,
     },
     update: {
@@ -66,9 +116,21 @@ export async function PATCH(req: NextRequest) {
       ...(data.emergencyContactPhone !== undefined
         ? { emergencyContactPhone: data.emergencyContactPhone }
         : {}),
+      ...(data.aadharNumber !== undefined ? { aadharNumber: data.aadharNumber } : {}),
+      // Only overwrite the stored document if a new one was actually sent —
+      // this lets someone update other fields without re-uploading the file.
+      ...(data.idDocumentData
+        ? {
+            idDocumentData: data.idDocumentData,
+            idDocumentName: data.idDocumentName ?? null,
+            idDocumentMimeType: data.idDocumentMimeType ?? null,
+          }
+        : {}),
       ...(data.markComplete ? { completedAt: new Date() } : {}),
     },
   });
 
-  return NextResponse.json({ profile });
+  return NextResponse.json({
+    profile: { ...profile, idDocumentData: undefined, hasIdDocument: Boolean(profile.idDocumentName) },
+  });
 }

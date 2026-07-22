@@ -53,6 +53,15 @@ enum AttendanceStatus {
   ABSENT
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  WON
+  LOST
+}
+
 model User {
   id           String   @id @default(cuid())
   employeeId   String   @unique
@@ -91,6 +100,8 @@ model User {
   ticketsHandled  Ticket[] @relation("TicketHandledBy")
   attendanceDays  AttendanceDay[]
   activityPings   ActivityPing[]
+  leadsAssigned   Lead[] @relation("LeadAssignedTo")
+  leadsCreated    Lead[] @relation("LeadCreatedBy")
 }
 
 model Client {
@@ -104,7 +115,29 @@ model Client {
   owner     User      @relation(fields: [ownerId], references: [id])
   invoices  Invoice[]
   meetings  Meeting[]
+  leads     Lead[]
+  tasks     Task[]
   createdAt DateTime  @default(now())
+}
+
+// Prospective clients being pursued — can later convert into a real Client.
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  company          String?
+  email            String?
+  phone            String?
+  source           String?
+  status           LeadStatus @default(NEW)
+  notes            String?
+  assignedToId     String
+  assignedTo       User       @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
+  createdById      String
+  createdBy        User       @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  convertedClientId String?   @unique
+  convertedClient  Client?    @relation(fields: [convertedClientId], references: [id])
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model Invoice {
@@ -161,6 +194,9 @@ model Task {
   assignedBy   User       @relation("TaskAssignedBy", fields: [assignedById], references: [id])
   assignedToId String
   assignedTo   User       @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  // Which client/brand this work is for — optional, for internal-only tasks.
+  clientId     String?
+  client       Client?    @relation(fields: [clientId], references: [id])
   subtasks     SubTask[]
   completedAt  DateTime?
   reminderSentAt DateTime?
@@ -223,6 +259,14 @@ model Profile {
   bio                   String?
   emergencyContactName  String?
   emergencyContactPhone String?
+  // KYC — Aadhaar number and a scanned copy, collected during first-login
+  // onboarding. The document is stored as a base64 data URL directly in the
+  // database (no external file storage configured); fine for occasional
+  // small ID scans, not meant for large files.
+  aadharNumber          String?
+  idDocumentData        String?   @db.Text
+  idDocumentName         String?
+  idDocumentMimeType     String?
   completedAt           DateTime?
   updatedAt             DateTime  @updatedAt
   createdAt             DateTime  @default(now())

@@ -14,6 +14,7 @@ export const config = {
     '/profile/:path*',
     '/tickets/:path*',
     '/attendance/:path*',
+    '/leads/:path*',
     '/api/employees/:path*',
     '/api/clients/:path*',
     '/api/invoices/:path*',
@@ -28,5 +29,6 @@ export const config = {
     '/api/offer-letter/:path*',
     '/api/salary-slip/:path*',
     '/api/attendance/:path*',
+    '/api/leads/:path*',
   ],
 };

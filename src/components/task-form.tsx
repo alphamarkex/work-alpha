@@ -8,12 +8,24 @@ interface ManagerOption {
   name: string;
 }
 
-export default function TaskForm({ managers }: { managers: ManagerOption[] }) {
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
+export default function TaskForm({
+  managers,
+  clients,
+}: {
+  managers: ManagerOption[];
+  clients: ClientOption[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assignedToId, setAssignedToId] = useState(managers[0]?.id ?? '');
+  const [clientId, setClientId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +49,7 @@ export default function TaskForm({ managers }: { managers: ManagerOption[] }) {
         description: description || null,
         assignedToId,
         dueDate: dueDate || null,
+        clientId: clientId || null,
       }),
     });
 
@@ -51,6 +64,7 @@ export default function TaskForm({ managers }: { managers: ManagerOption[] }) {
     setTitle('');
     setDescription('');
     setDueDate('');
+    setClientId('');
     setOpen(false);
     router.refresh();
   }
@@ -95,6 +109,19 @@ export default function TaskForm({ managers }: { managers: ManagerOption[] }) {
         {managers.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={clientId}
+        onChange={(e) => setClientId(e.target.value)}
+        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+      >
+        <option value="">No specific brand/client (internal)</option>
+        {clients.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
           </option>
         ))}
       </select>
