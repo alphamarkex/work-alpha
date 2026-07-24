@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const founders = [
-    { name: 'Founder One', email: 'lopasrivastav231105@gmail.com', password: 'ChangeMe123!' },
+    { name: 'Founder One', email: 'lopasrivastav231105@gmail.com', password: 'Lopa@123' },
     { name: 'Founder Two', email: 'harshilsrivastava1123@gmail.com', password: 'ChangeMe123!' },
   ];
 
