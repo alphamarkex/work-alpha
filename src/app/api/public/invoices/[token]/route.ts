@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateInvoicePdf } from '@/lib/pdf';
-import { COMPANY } from '@/lib/company';
 
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const invoice = await prisma.invoice.findUnique({
     where: { publicToken: params.token },
-    include: { client: true },
+    include: { client: true, organization: true },
   });
 
   if (!invoice) {
@@ -16,10 +15,10 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   }
 
   const pdfBuffer = await generateInvoicePdf({
-    companyName: COMPANY.name,
-    companyGstin: COMPANY.gstin,
-    companyAddress: COMPANY.address,
-    companyEmail: COMPANY.email,
+    companyName: invoice.organization.name,
+    companyGstin: invoice.organization.gstin || '________________',
+    companyAddress: invoice.organization.address || '________________',
+    companyEmail: invoice.organization.email || '________________',
     invoiceNo: invoice.invoiceNo,
     createdAt: invoice.createdAt,
     dueDate: invoice.dueDate,

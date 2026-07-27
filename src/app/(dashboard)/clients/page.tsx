@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth';
+import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getVisibleUserIds } from '@/lib/permissions';
@@ -9,7 +10,10 @@ export default async function ClientsPage() {
   const user = session!.user;
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
-  const where = visibleIds ? { ownerId: { in: visibleIds } } : {};
+  const where = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { ownerId: { in: visibleIds } } : {}),
+  };
 
   const clients = await prisma.client.findMany({
     where,
@@ -53,7 +57,11 @@ export default async function ClientsPage() {
             )}
             {clients.map((client) => (
               <tr key={client.id}>
-                <td className="px-4 py-3 font-medium text-gray-900">{client.name}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">
+                  <Link href={`/clients/${client.id}`} className="hover:text-brand-600 hover:underline">
+                    {client.name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-gray-500">{client.gstin ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-500">
                   {client.email ?? client.phone ?? '—'}

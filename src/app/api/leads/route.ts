@@ -29,7 +29,10 @@ export async function GET() {
   }
 
   const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  const where = visibleIds ? { assignedToId: { in: visibleIds } } : {};
+  const where = {
+    assignedTo: { organizationId: session.user.organizationId },
+    ...(visibleIds ? { assignedToId: { in: visibleIds } } : {}),
+  };
 
   const leads = await prisma.lead.findMany({
     where,
@@ -62,6 +65,10 @@ export async function POST(req: NextRequest) {
   // Founder/Manager routing a new lead to the right person); defaults to self.
   let assignedToId = session.user.id;
   if (data.assignedToId && data.assignedToId !== session.user.id) {
+    const assignee = await prisma.user.findUnique({ where: { id: data.assignedToId } });
+    if (!assignee || assignee.organizationId !== session.user.organizationId) {
+      return NextResponse.json({ error: 'Invalid assignee' }, { status: 400 });
+    }
     const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
     if (visibleIds && !visibleIds.includes(data.assignedToId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -103,8 +110,8 @@ export async function PATCH(req: NextRequest) {
 
   const data = parsed.data;
 
-  const lead = await prisma.lead.findUnique({ where: { id: data.id } });
-  if (!lead) {
+  const lead = await prisma.lead.findUnique({ where: { id: data.id }, include: { assignedTo: true } });
+  if (!lead || lead.assignedTo.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
   }
 
@@ -113,8 +120,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (data.assignedToId && visibleIds && !visibleIds.includes(data.assignedToId)) {
-    return NextResponse.json({ error: 'Cannot reassign outside your visible team' }, { status: 403 });
+  if (data.assignedToId) {
+    const newAssignee = await prisma.user.findUnique({ where: { id: data.assignedToId } });
+    if (!newAssignee || newAssignee.organizationId !== session.user.organizationId) {
+      return NextResponse.json({ error: 'Invalid assignee' }, { status: 400 });
+    }
+    if (visibleIds && !visibleIds.includes(data.assignedToId)) {
+      return NextResponse.json({ error: 'Cannot reassign outside your visible team' }, { status: 403 });
+    }
   }
 
   const updated = await prisma.lead.update({
@@ -146,8 +159,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Missing lead id' }, { status: 400 });
   }
 
-  const lead = await prisma.lead.findUnique({ where: { id } });
-  if (!lead) {
+  const lead = await prisma.lead.findUnique({ where: { id }, include: { assignedTo: true } });
+  if (!lead || lead.assignedTo.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
   }
 

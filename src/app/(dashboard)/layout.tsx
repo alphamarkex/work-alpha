@@ -20,6 +20,13 @@ export default async function DashboardLayout({
     redirect('/change-password');
   }
 
+  // Client-portal accounts never see the staff dashboard, the internal
+  // profile/KYC onboarding, or the attendance tracker — they get their own
+  // minimal layout under /client-portal instead.
+  if (session.user.role === 'CLIENT') {
+    redirect('/client-portal');
+  }
+
   const profile = await prisma.profile.findUnique({ where: { userId: session.user.id } });
   if (!profile?.completedAt) {
     redirect('/profile/setup');

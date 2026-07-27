@@ -1,22 +1,50 @@
-// Shift rules: 10:00–16:00, break capped at 60 minutes, idle >5 min = "missing".
+// Shift rules: 10:00–16:00 IST, break capped at 60 minutes, idle >5 min = "missing".
+//
+// IMPORTANT: all shift/day boundaries are computed in India Standard Time
+// (UTC+5:30, no daylight saving) regardless of what timezone the server
+// process itself runs in — Vercel's functions run in UTC by default, so
+// naive `Date.setHours()` would treat "10:00" as 10:00 UTC (i.e. 3:30 PM
+// IST), not 10:00 AM IST. The helpers below convert explicitly instead of
+// relying on the server's local timezone.
 
-export const SHIFT_START_HOUR = 10; // 10:00 AM
-export const SHIFT_END_HOUR = 16; // 4:00 PM
+export const SHIFT_START_HOUR = 10; // 10:00 AM IST
+export const SHIFT_END_HOUR = 16; // 4:00 PM IST
 export const MAX_BREAK_MINUTES = 60;
 export const IDLE_THRESHOLD_MINUTES = 5;
-export const LATE_GRACE_MINUTES = 0; // clock-in after 10:00 sharp counts as late
+export const LATE_GRACE_MINUTES = 0; // clock-in after 10:00 IST sharp counts as late
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/**
+ * Given a real instant, returns a Date whose UTC getters (getUTCHours,
+ * getUTCDate, etc.) reflect India's wall-clock time at that instant.
+ * Only ever read this with getUTC* methods — its own "instant" is not
+ * meaningful, it's just a carrier for IST wall-clock components.
+ */
+function toIstWallClock(date: Date): Date {
+  return new Date(date.getTime() + IST_OFFSET_MS);
+}
+
+/** Reverses toIstWallClock: turns IST wall-clock components (built via Date.UTC) back into the real instant. */
+function fromIstWallClock(istWallClock: Date): Date {
+  return new Date(istWallClock.getTime() - IST_OFFSET_MS);
+}
 
 export function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const wall = toIstWallClock(date);
+  const istMidnight = new Date(
+    Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate(), 0, 0, 0, 0)
+  );
+  return fromIstWallClock(istMidnight);
 }
 
 export function getShiftWindow(date: Date): { start: Date; end: Date } {
-  const start = new Date(date);
-  start.setHours(SHIFT_START_HOUR, 0, 0, 0);
-  const end = new Date(date);
-  end.setHours(SHIFT_END_HOUR, 0, 0, 0);
+  const wall = toIstWallClock(date);
+  const y = wall.getUTCFullYear();
+  const m = wall.getUTCMonth();
+  const d = wall.getUTCDate();
+  const start = fromIstWallClock(new Date(Date.UTC(y, m, d, SHIFT_START_HOUR, 0, 0, 0)));
+  const end = fromIstWallClock(new Date(Date.UTC(y, m, d, SHIFT_END_HOUR, 0, 0, 0)));
   return { start, end };
 }
 

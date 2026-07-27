@@ -53,6 +53,20 @@ export function canHandleTickets(role: Role) {
   return role === 'FOUNDER' || role === 'MANAGER';
 }
 
+// Creating/resetting a client's portal login, and uploading documents
+// against a client record.
+export function canManageClientPortal(role: Role) {
+  return role === 'FOUNDER' || role === 'MANAGER';
+}
+
+export function canManageHolidays(role: Role) {
+  return role === 'FOUNDER' || role === 'MANAGER';
+}
+
+export function canReviewLeaves(role: Role) {
+  return role === 'FOUNDER' || role === 'MANAGER';
+}
+
 // Returns the list of user IDs whose data a given user is allowed to see
 export async function getVisibleUserIds(userId: string, role: Role): Promise<string[] | null> {
   if (role === 'FOUNDER') return null; // null = no restriction, sees everyone

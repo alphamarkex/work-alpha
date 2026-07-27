@@ -10,8 +10,13 @@ export default async function MeetingsPage() {
   const user = session!.user;
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
-  const where = visibleIds ? { hostId: { in: visibleIds } } : {};
-  const clientWhere = visibleIds ? { ownerId: { in: visibleIds } } : {};
+  // Meetings are visible company-wide — anyone in the organization can see
+  // any meeting (and its join link), not just their own reporting chain.
+  const where = { host: { organizationId: user.organizationId } };
+  const clientWhere = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { ownerId: { in: visibleIds } } : {}),
+  };
 
   const [meetings, clients] = await Promise.all([
     prisma.meeting.findMany({

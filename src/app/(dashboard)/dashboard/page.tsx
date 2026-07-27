@@ -10,9 +10,18 @@ export default async function DashboardPage() {
   const user = session!.user;
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
-  const ownerFilter = visibleIds ? { ownerId: { in: visibleIds } } : {};
-  const raisedByFilter = visibleIds ? { raisedById: { in: visibleIds } } : {};
-  const hostFilter = visibleIds ? { hostId: { in: visibleIds } } : {};
+  const ownerFilter = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { ownerId: { in: visibleIds } } : {}),
+  };
+  const raisedByFilter = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { raisedById: { in: visibleIds } } : {}),
+  };
+  const hostFilter = {
+    host: { organizationId: user.organizationId },
+    ...(visibleIds ? { hostId: { in: visibleIds } } : {}),
+  };
 
   const now = new Date();
   const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

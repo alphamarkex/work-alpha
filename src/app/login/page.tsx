@@ -87,6 +87,13 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <Link
+            href="/signup"
+            className="block text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            New company? Create your workspace
+          </Link>
         </form>
       </div>
     </div>

@@ -28,16 +28,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { id, role } = session.user;
+  const { id, role, organizationId } = session.user;
 
-  // Founders see every task they've handed out; Managers see tasks handed to
-  // them; Employees see the parent tasks behind the sub-tasks assigned to them.
+  // Founders see every task in their own organization; Managers see tasks
+  // handed to them; Employees see the parent tasks behind the sub-tasks
+  // assigned to them.
   const where =
     role === 'FOUNDER'
-      ? {}
+      ? { organizationId }
       : role === 'MANAGER'
-        ? { assignedToId: id }
-        : { subtasks: { some: { assignedToId: id } } };
+        ? { organizationId, assignedToId: id }
+        : { organizationId, subtasks: { some: { assignedToId: id } } };
 
   const tasks = await prisma.task.findMany({
     where,
@@ -77,14 +78,23 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+  const { organizationId } = session.user;
 
   const manager = await prisma.user.findUnique({ where: { id: data.assignedToId } });
-  if (!manager || manager.role !== 'MANAGER') {
-    return NextResponse.json({ error: 'Tasks can only be assigned to a Manager' }, { status: 400 });
+  if (!manager || manager.role !== 'MANAGER' || manager.organizationId !== organizationId) {
+    return NextResponse.json({ error: 'Tasks can only be assigned to a Manager in your organization' }, { status: 400 });
+  }
+
+  if (data.clientId) {
+    const client = await prisma.client.findUnique({ where: { id: data.clientId } });
+    if (!client || client.organizationId !== organizationId) {
+      return NextResponse.json({ error: 'Invalid client' }, { status: 400 });
+    }
   }
 
   const task = await prisma.task.create({
     data: {
+      organizationId,
       title: data.title,
       description: data.description ?? null,
       assignedById: session.user.id,
@@ -127,7 +137,7 @@ export async function PATCH(req: NextRequest) {
   const data = parsed.data;
 
   const task = await prisma.task.findUnique({ where: { id: data.id } });
-  if (!task) {
+  if (!task || task.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
@@ -170,6 +180,11 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
+  }
+
+  const task = await prisma.task.findUnique({ where: { id } });
+  if (!task || task.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
   await prisma.task.delete({ where: { id } });

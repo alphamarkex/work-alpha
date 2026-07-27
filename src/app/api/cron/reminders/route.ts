@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const meetingResults: { meetingId: string; emailSent: boolean; whatsappSent: number }[] = [];
 
   for (const meeting of meetings) {
-    const whenText = meeting.scheduledAt.toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' });
+    const whenText = meeting.scheduledAt.toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
     const emailRecipients = [meeting.host.email, meeting.client?.email].filter(
       (e): e is string => Boolean(e)
     );
@@ -63,8 +63,8 @@ export async function GET(req: NextRequest) {
       ]
         .filter(Boolean)
         .join('\n');
-      const dateLabel = meeting.scheduledAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const timeLabel = meeting.scheduledAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+      const dateLabel = meeting.scheduledAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+      const timeLabel = meeting.scheduledAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 
       for (const number of whatsappNumbers) {
         const result = await sendMeetingReminderWhatsApp({

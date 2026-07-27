@@ -106,9 +106,9 @@ export default function AttendanceTracker() {
     <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
       <span className="text-sm font-medium text-gray-700">
         {day.clockOutAt
-          ? `Clocked out at ${new Date(day.clockOutAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+          ? `Clocked out at ${new Date(day.clockOutAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
           : day.clockInAt
-            ? `Clocked in at ${new Date(day.clockInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+            ? `Clocked in at ${new Date(day.clockInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
             : 'Not clocked in yet'}
       </span>
 

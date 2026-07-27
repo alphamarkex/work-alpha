@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { canHandleTickets, getVisibleUserIds } from '@/lib/permissions';
+import { canHandleTickets } from '@/lib/permissions';
 
 const createTicketSchema = z.object({
   title: z.string().min(1),
@@ -22,11 +22,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  const where = visibleIds ? { raisedById: { in: visibleIds } } : {};
+  // Tickets are an internal-company channel — every Founder/Manager/Employee
+  // sees every ticket raised by anyone on staff, but Client-portal accounts
+  // never see this at all (they can't reach this page, and are blocked here
+  // too as a second layer of defense).
+  if (session.user.role === 'CLIENT') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const tickets = await prisma.ticket.findMany({
-    where,
+    where: { raisedBy: { organizationId: session.user.organizationId } },
     include: {
       raisedBy: { select: { id: true, name: true } },
       handledBy: { select: { id: true, name: true } },
@@ -83,14 +88,12 @@ export async function PATCH(req: NextRequest) {
 
   const data = parsed.data;
 
-  const ticket = await prisma.ticket.findUnique({ where: { id: data.id } });
-  if (!ticket) {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: data.id },
+    include: { raisedBy: true },
+  });
+  if (!ticket || ticket.raisedBy.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
-  }
-
-  const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  if (visibleIds && !visibleIds.includes(ticket.raisedById)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const updated = await prisma.ticket.update({

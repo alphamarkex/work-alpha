@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
   }
 
   const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  const where = visibleIds ? { raisedById: { in: visibleIds } } : {};
+  const where = {
+    organizationId: session.user.organizationId,
+    ...(visibleIds ? { raisedById: { in: visibleIds } } : {}),
+  };
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
@@ -60,9 +63,10 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+  const { organizationId } = session.user;
 
   const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) {
+  if (!client || client.organizationId !== organizationId) {
     return NextResponse.json({ error: 'Client not found' }, { status: 404 });
   }
 
@@ -74,14 +78,16 @@ export async function POST(req: NextRequest) {
 
   const breakdown = calculateGst(data.amount, data.gstRate, data.interState);
 
+  const organization = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
   const { start: fyStart } = getFinancialYearRange();
   const countThisFY = await prisma.invoice.count({
-    where: { createdAt: { gte: fyStart } },
+    where: { organizationId, createdAt: { gte: fyStart } },
   });
-  const invoiceNo = generateInvoiceNo(countThisFY);
+  const invoiceNo = generateInvoiceNo(countThisFY, organization.name);
 
   const invoice = await prisma.invoice.create({
     data: {
+      organizationId,
       invoiceNo,
       clientId: data.clientId,
       raisedById: session.user.id,
@@ -121,6 +127,11 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'Missing invoice id' }, { status: 400 });
+  }
+
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice || invoice.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
   }
 
   await prisma.invoice.delete({ where: { id } });

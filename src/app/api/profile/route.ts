@@ -22,6 +22,10 @@ const profileSchema = z.object({
     .nullable(),
   idDocumentName: z.string().optional().nullable(),
   idDocumentMimeType: z.string().optional().nullable(),
+  bankAccountHolderName: z.string().optional().nullable(),
+  bankAccountNumber: z.string().optional().nullable(),
+  bankIfsc: z.string().optional().nullable(),
+  bankName: z.string().optional().nullable(),
   markComplete: z.boolean().optional(),
 });
 
@@ -47,6 +51,10 @@ export async function GET() {
       aadharNumber: true,
       idDocumentName: true,
       idDocumentMimeType: true,
+      bankAccountHolderName: true,
+      bankAccountNumber: true,
+      bankIfsc: true,
+      bankName: true,
       completedAt: true,
     },
   });
@@ -101,6 +109,10 @@ export async function PATCH(req: NextRequest) {
       idDocumentData: data.idDocumentData ?? null,
       idDocumentName: data.idDocumentName ?? null,
       idDocumentMimeType: data.idDocumentMimeType ?? null,
+      bankAccountHolderName: data.bankAccountHolderName ?? null,
+      bankAccountNumber: data.bankAccountNumber ?? null,
+      bankIfsc: data.bankIfsc ?? null,
+      bankName: data.bankName ?? null,
       completedAt: data.markComplete ? new Date() : null,
     },
     update: {
@@ -117,6 +129,12 @@ export async function PATCH(req: NextRequest) {
         ? { emergencyContactPhone: data.emergencyContactPhone }
         : {}),
       ...(data.aadharNumber !== undefined ? { aadharNumber: data.aadharNumber } : {}),
+      ...(data.bankAccountHolderName !== undefined
+        ? { bankAccountHolderName: data.bankAccountHolderName }
+        : {}),
+      ...(data.bankAccountNumber !== undefined ? { bankAccountNumber: data.bankAccountNumber } : {}),
+      ...(data.bankIfsc !== undefined ? { bankIfsc: data.bankIfsc } : {}),
+      ...(data.bankName !== undefined ? { bankName: data.bankName } : {}),
       // Only overwrite the stored document if a new one was actually sent —
       // this lets someone update other fields without re-uploading the file.
       ...(data.idDocumentData

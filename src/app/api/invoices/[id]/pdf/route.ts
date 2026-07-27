@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getVisibleUserIds } from '@/lib/permissions';
 import { generateInvoicePdf } from '@/lib/pdf';
-import { COMPANY } from '@/lib/company';
 
 export const runtime = 'nodejs';
 
@@ -16,11 +15,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { client: true },
+    include: { client: true, organization: true },
   });
 
   if (!invoice) {
     return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+  }
+
+  // Tenant boundary — this must hold regardless of role or hierarchy checks.
+  if (invoice.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
@@ -29,10 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const pdfBuffer = await generateInvoicePdf({
-    companyName: COMPANY.name,
-    companyGstin: COMPANY.gstin,
-    companyAddress: COMPANY.address,
-    companyEmail: COMPANY.email,
+    companyName: invoice.organization.name,
+    companyGstin: invoice.organization.gstin || '________________',
+    companyAddress: invoice.organization.address || '________________',
+    companyEmail: invoice.organization.email || '________________',
     invoiceNo: invoice.invoiceNo,
     createdAt: invoice.createdAt,
     dueDate: invoice.dueDate,

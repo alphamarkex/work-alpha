@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const employee = await prisma.user.findUnique({ where: { id: parsed.data.id } });
-  if (!employee) {
+  if (!employee || employee.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
   }
 

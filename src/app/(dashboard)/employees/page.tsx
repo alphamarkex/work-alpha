@@ -14,10 +14,10 @@ export default async function EmployeesPage() {
 
   const where =
     user.role === 'FOUNDER'
-      ? {}
+      ? { organizationId: user.organizationId }
       : user.role === 'MANAGER'
-        ? { OR: [{ id: user.id }, { managerId: user.id }] }
-        : { id: user.id };
+        ? { organizationId: user.organizationId, OR: [{ id: user.id }, { managerId: user.id }] }
+        : { organizationId: user.organizationId, id: user.id };
 
   const employees = await prisma.user.findMany({
     where,
@@ -26,7 +26,7 @@ export default async function EmployeesPage() {
   });
 
   const potentialManagers = await prisma.user.findMany({
-    where: { role: { in: ['FOUNDER', 'MANAGER'] } },
+    where: { role: { in: ['FOUNDER', 'MANAGER'] }, organizationId: user.organizationId },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   });

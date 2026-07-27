@@ -10,8 +10,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const lead = await prisma.lead.findUnique({ where: { id: params.id } });
-  if (!lead) {
+  const lead = await prisma.lead.findUnique({ where: { id: params.id }, include: { assignedTo: true } });
+  if (!lead || lead.assignedTo.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
   }
 
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const [client] = await prisma.$transaction([
     prisma.client.create({
       data: {
+        organizationId: session.user.organizationId,
         name: lead.company || lead.name,
         email: lead.email,
         phone: lead.phone,

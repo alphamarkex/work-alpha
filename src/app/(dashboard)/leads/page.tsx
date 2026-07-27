@@ -11,7 +11,10 @@ export default async function LeadsPage() {
   const user = session!.user;
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
-  const where = visibleIds ? { assignedToId: { in: visibleIds } } : {};
+  const where = {
+    assignedTo: { organizationId: user.organizationId },
+    ...(visibleIds ? { assignedToId: { in: visibleIds } } : {}),
+  };
 
   const [leads, assignees] = await Promise.all([
     prisma.lead.findMany({
@@ -28,7 +31,10 @@ export default async function LeadsPage() {
     user.role === 'EMPLOYEE'
       ? Promise.resolve([])
       : prisma.user.findMany({
-          where: visibleIds ? { id: { in: visibleIds } } : {},
+          where: {
+            organizationId: user.organizationId,
+            ...(visibleIds ? { id: { in: visibleIds } } : {}),
+          },
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         }),

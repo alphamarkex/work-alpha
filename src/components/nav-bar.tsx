@@ -13,6 +13,8 @@ const links = [
   { href: '/meetings', label: 'Meetings' },
   { href: '/tasks', label: 'Tasks' },
   { href: '/tickets', label: 'Tickets' },
+  { href: '/holidays', label: 'Holidays' },
+  { href: '/leaves', label: 'Leave' },
   { href: '/employees', label: 'Employees' },
   { href: '/profile', label: 'Profile' },
 ];

@@ -19,8 +19,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  const where = visibleIds ? { hostId: { in: visibleIds } } : {};
+  // Meetings are visible company-wide — anyone in the organization can see
+  // any meeting (and its join link), not just ones they host or their
+  // reporting chain hosts.
+  const where = { host: { organizationId: session.user.organizationId } };
 
   const { searchParams } = new URL(req.url);
   const upcoming = searchParams.get('upcoming');
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   if (data.clientId) {
     const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-    if (!client) {
+    if (!client || client.organizationId !== session.user.organizationId) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
 

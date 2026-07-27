@@ -37,15 +37,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { role, id } = session.user;
+  const { role, id, organizationId } = session.user;
 
-  // Founders see everyone; managers see their direct reports; employees see themselves.
+  // Founders see everyone in their own organization (never another
+  // company's); managers see their direct reports; employees see themselves.
   const where =
     role === 'FOUNDER'
-      ? {}
+      ? { organizationId }
       : role === 'MANAGER'
-        ? { OR: [{ id }, { managerId: id }] }
-        : { id };
+        ? { organizationId, OR: [{ id }, { managerId: id }] }
+        : { organizationId, id };
 
   const employees = await prisma.user.findMany({
     where,
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+  const { organizationId } = session.user;
 
   // Only founders can create other founders or managers.
   if (data.role !== 'EMPLOYEE' && session.user.role !== 'FOUNDER') {
@@ -94,17 +96,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: data.email }, { employeeId: data.employeeId }] },
+  // A manager assigned to the new hire must belong to the same organization.
+  if (data.managerId) {
+    const manager = await prisma.user.findUnique({ where: { id: data.managerId } });
+    if (!manager || manager.organizationId !== organizationId) {
+      return NextResponse.json({ error: 'Invalid manager' }, { status: 400 });
+    }
+  }
+
+  const existingEmail = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existingEmail) {
+    return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
+  }
+  const existingEmployeeId = await prisma.user.findUnique({
+    where: { organizationId_employeeId: { organizationId, employeeId: data.employeeId } },
   });
-  if (existing) {
-    return NextResponse.json({ error: 'Email or employee ID already in use' }, { status: 409 });
+  if (existingEmployeeId) {
+    return NextResponse.json({ error: 'Employee ID already in use' }, { status: 409 });
   }
 
   const passwordHash = await bcrypt.hash(data.password, 10);
 
   const employee = await prisma.user.create({
     data: {
+      organizationId,
       employeeId: data.employeeId,
       name: data.name,
       email: data.email,
@@ -161,6 +176,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  const target = await prisma.user.findUnique({ where: { id: data.id } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   if (data.email) {
     const existing = await prisma.user.findFirst({
@@ -220,6 +240,11 @@ export async function DELETE(req: NextRequest) {
 
   if (id === session.user.id) {
     return NextResponse.json({ error: "You can't remove your own account" }, { status: 400 });
+  }
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Soft-delete: deactivate rather than hard-delete, since employees are

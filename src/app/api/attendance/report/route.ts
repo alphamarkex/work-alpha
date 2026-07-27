@@ -26,8 +26,15 @@ export async function GET(req: NextRequest) {
 
   const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
   const userWhere = visibleIds
-    ? { id: { in: visibleIds }, role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> } }
-    : { role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> } };
+    ? {
+        id: { in: visibleIds },
+        organizationId: session.user.organizationId,
+        role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> },
+      }
+    : {
+        organizationId: session.user.organizationId,
+        role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> },
+      };
 
   const users = await prisma.user.findMany({
     where: userWhere,

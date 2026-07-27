@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateSalarySlipPdf } from '@/lib/pdf';
-import { COMPANY } from '@/lib/company';
 
 export const runtime = 'nodejs';
 
@@ -14,14 +13,22 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
   }
 
   const targetId = params.userId;
-  const isSelf = session.user.id === targetId;
-  const isFounder = session.user.role === 'FOUNDER';
 
-  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    include: { organization: true },
+  });
   if (!target) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
+  // Tenant boundary — must hold regardless of role.
+  if (target.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const isSelf = session.user.id === targetId;
+  const isFounder = session.user.role === 'FOUNDER';
   const isManagerOfTarget = session.user.role === 'MANAGER' && target.managerId === session.user.id;
 
   if (!isSelf && !isFounder && !isManagerOfTarget) {
@@ -41,8 +48,8 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
   const monthLabel = monthDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   const pdfBuffer = await generateSalarySlipPdf({
-    companyName: COMPANY.name,
-    companyAddress: COMPANY.address,
+    companyName: target.organization.name,
+    companyAddress: target.organization.address || '',
     employeeName: target.name,
     employeeId: target.employeeId,
     designation: target.designation,

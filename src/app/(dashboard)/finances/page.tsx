@@ -19,20 +19,24 @@ export default async function FinancesPage() {
   const [invoiceStats, expenses, allUsers, clientCount, employeeCount] = await Promise.all([
     prisma.invoice.groupBy({
       by: ['status'],
+      where: { organizationId: user.organizationId },
       _sum: { totalAmount: true },
       _count: { _all: true },
     }),
     prisma.expense.findMany({
+      where: { addedBy: { organizationId: user.organizationId } },
       include: { addedBy: { select: { name: true } } },
       orderBy: { expenseDate: 'desc' },
     }),
     prisma.user.findMany({
-      where: { active: true },
+      where: { active: true, organizationId: user.organizationId },
       select: { id: true, name: true, email: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.client.count(),
-    prisma.user.count({ where: { role: { in: ['MANAGER', 'EMPLOYEE'] }, active: true } }),
+    prisma.client.count({ where: { organizationId: user.organizationId } }),
+    prisma.user.count({
+      where: { role: { in: ['MANAGER', 'EMPLOYEE'] }, active: true, organizationId: user.organizationId },
+    }),
   ]);
 
   const paidTotal = Number(invoiceStats.find((s) => s.status === 'PAID')?._sum.totalAmount ?? 0);

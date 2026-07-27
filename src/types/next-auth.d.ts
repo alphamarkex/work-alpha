@@ -11,6 +11,8 @@ declare module 'next-auth' {
       role: Role;
       employeeId: string;
       mustChangePassword: boolean;
+      portalClientId: string | null;
+      organizationId: string;
     };
   }
 }

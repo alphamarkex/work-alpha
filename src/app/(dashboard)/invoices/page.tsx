@@ -18,8 +18,14 @@ export default async function InvoicesPage() {
   const user = session!.user;
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
-  const where = visibleIds ? { raisedById: { in: visibleIds } } : {};
-  const clientWhere = visibleIds ? { ownerId: { in: visibleIds } } : {};
+  const where = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { raisedById: { in: visibleIds } } : {}),
+  };
+  const clientWhere = {
+    organizationId: user.organizationId,
+    ...(visibleIds ? { ownerId: { in: visibleIds } } : {}),
+  };
 
   const [invoices, clients] = await Promise.all([
     prisma.invoice.findMany({

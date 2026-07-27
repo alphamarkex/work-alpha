@@ -22,7 +22,10 @@ export async function GET() {
   }
 
   const visibleIds = await getVisibleUserIds(session.user.id, session.user.role);
-  const where = visibleIds ? { ownerId: { in: visibleIds } } : {};
+  const where = {
+    organizationId: session.user.organizationId,
+    ...(visibleIds ? { ownerId: { in: visibleIds } } : {}),
+  };
 
   const clients = await prisma.client.findMany({
     where,
@@ -54,17 +57,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid GSTIN format' }, { status: 400 });
   }
 
-  // Only founders/managers may create a client on behalf of someone else.
+  // Only founders/managers may create a client on behalf of someone else —
+  // and only someone in the same organization.
   let ownerId = session.user.id;
   if (data.ownerId && data.ownerId !== session.user.id) {
     if (session.user.role === 'EMPLOYEE') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const owner = await prisma.user.findUnique({ where: { id: data.ownerId } });
+    if (!owner || owner.organizationId !== session.user.organizationId) {
+      return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
     }
     ownerId = data.ownerId;
   }
 
   const client = await prisma.client.create({
     data: {
+      organizationId: session.user.organizationId,
       name: data.name,
       gstin: data.gstin ?? null,
       email: data.email ?? null,

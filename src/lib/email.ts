@@ -229,6 +229,32 @@ export async function sendWelcomeEmail(params: {
   });
 }
 
+/** Sent when a client gets portal access — separate copy since they don't go through the staff profile/onboarding flow. */
+export async function sendClientPortalWelcomeEmail(params: {
+  to: string;
+  name: string;
+  email: string;
+  temporaryPassword: string;
+  loginUrl: string;
+}) {
+  const { to, name, email, temporaryPassword, loginUrl } = params;
+  return sendEmail({
+    to,
+    subject: 'Your client portal access is ready',
+    text: [
+      `Hi ${name},`,
+      ``,
+      `You now have access to your client portal, where you can track the work being done for you and view your documents.`,
+      ``,
+      `Login page: ${loginUrl}`,
+      `Email: ${email}`,
+      `Temporary password: ${temporaryPassword}`,
+      ``,
+      `You'll be asked to set a new password the first time you sign in.`,
+    ].join('\n'),
+  });
+}
+
 /** Sent when a Founder resets someone's password on their behalf. */
 export async function sendPasswordResetByAdminEmail(params: {
   to: string;

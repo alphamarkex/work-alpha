@@ -27,12 +27,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { id, role } = session.user;
+  const { id, role, organizationId } = session.user;
 
   const where =
     role === 'FOUNDER'
-      ? {}
-      : { OR: [{ assignedById: id }, { assignedToId: id }] };
+      ? { task: { organizationId } }
+      : { task: { organizationId }, OR: [{ assignedById: id }, { assignedToId: id }] };
 
   const subtasks = await prisma.subTask.findMany({
     where,
@@ -60,9 +60,10 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+  const { organizationId } = session.user;
 
   const task = await prisma.task.findUnique({ where: { id: data.taskId } });
-  if (!task) {
+  if (!task || task.organizationId !== organizationId) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
   }
 
   const assignee = await prisma.user.findUnique({ where: { id: data.assignedToId } });
-  if (!assignee || !assignee.active) {
+  if (!assignee || !assignee.active || assignee.organizationId !== organizationId) {
     return NextResponse.json({ error: 'Assignee not found or inactive' }, { status: 400 });
   }
 
@@ -135,8 +136,8 @@ export async function PATCH(req: NextRequest) {
 
   const data = parsed.data;
 
-  const subtask = await prisma.subTask.findUnique({ where: { id: data.id } });
-  if (!subtask) {
+  const subtask = await prisma.subTask.findUnique({ where: { id: data.id }, include: { task: true } });
+  if (!subtask || subtask.task.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Sub-task not found' }, { status: 404 });
   }
 
@@ -186,8 +187,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Missing sub-task id' }, { status: 400 });
   }
 
-  const subtask = await prisma.subTask.findUnique({ where: { id } });
-  if (!subtask) {
+  const subtask = await prisma.subTask.findUnique({ where: { id }, include: { task: true } });
+  if (!subtask || subtask.task.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: 'Sub-task not found' }, { status: 404 });
   }
 

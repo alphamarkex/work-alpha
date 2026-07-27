@@ -11,8 +11,9 @@ export default async function TasksPage() {
 
   const taskWhere =
     user.role === 'FOUNDER'
-      ? {}
+      ? { organizationId: user.organizationId }
       : {
+          organizationId: user.organizationId,
           OR: [
             { assignedToId: user.id },
             { subtasks: { some: { assignedToId: user.id } } },
@@ -39,7 +40,7 @@ export default async function TasksPage() {
     }),
     user.role === 'FOUNDER'
       ? prisma.user.findMany({
-          where: { role: 'MANAGER', active: true },
+          where: { role: 'MANAGER', active: true, organizationId: user.organizationId },
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         })
@@ -47,12 +48,16 @@ export default async function TasksPage() {
     // Any active teammate can be a sub-task delegate target — not limited to
     // direct reports, so this is the full active roster minus the viewer.
     prisma.user.findMany({
-      where: { active: true, id: { not: user.id } },
+      where: { active: true, id: { not: user.id }, organizationId: user.organizationId },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
     user.role === 'FOUNDER'
-      ? prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+      ? prisma.client.findMany({
+          where: { organizationId: user.organizationId },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
       : Promise.resolve([]),
   ]);
 

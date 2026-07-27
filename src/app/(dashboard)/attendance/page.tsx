@@ -4,6 +4,12 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getVisibleUserIds } from '@/lib/permissions';
 import { startOfDay, getShiftWindow, computeMissingIntervals, sumMinutes } from '@/lib/attendance';
+import {
+  isHubstaffConfigured,
+  getHubstaffMembers,
+  getHubstaffDailyActivity,
+  getHubstaffAppUsage,
+} from '@/lib/hubstaff';
 import clsx from 'clsx';
 
 export default async function AttendancePage({
@@ -22,15 +28,23 @@ export default async function AttendancePage({
   const day = startOfDay(date);
   const { start: shiftStart, end: shiftEnd } = getShiftWindow(day);
   const now = new Date();
+  const dateStr = day.toISOString().slice(0, 10);
 
   const visibleIds = await getVisibleUserIds(user.id, user.role);
   const userWhere = visibleIds
-    ? { id: { in: visibleIds }, role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> } }
-    : { role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> } };
+    ? {
+        id: { in: visibleIds },
+        organizationId: user.organizationId,
+        role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> },
+      }
+    : {
+        organizationId: user.organizationId,
+        role: { in: ['MANAGER', 'EMPLOYEE'] as Array<'MANAGER' | 'EMPLOYEE'> },
+      };
 
   const teamMembers = await prisma.user.findMany({
     where: userWhere,
-    select: { id: true, name: true, employeeId: true },
+    select: { id: true, name: true, employeeId: true, email: true },
     orderBy: { name: 'asc' },
   });
 
@@ -76,14 +90,57 @@ export default async function AttendancePage({
     })
   );
 
-  const dateStr = day.toISOString().slice(0, 10);
+  // Real, system-wide activity + app usage — sourced from Hubstaff's desktop
+  // agent, which is the only thing that can actually see this (a browser
+  // tab cannot watch other applications). No-ops gracefully if not configured.
+  const hubstaffEnabled = isHubstaffConfigured();
+  let hubstaffRows: Array<{
+    member: (typeof teamMembers)[number];
+    trackedMinutes: number;
+    keyboardPercent: number;
+    mousePercent: number;
+    topApps: Array<{ appName: string; minutes: number }>;
+  }> = [];
+
+  if (hubstaffEnabled) {
+    const [members, dailyActivity, appUsage] = await Promise.all([
+      getHubstaffMembers(),
+      getHubstaffDailyActivity(dateStr),
+      getHubstaffAppUsage(dateStr),
+    ]);
+
+    const emailToHubstaffId = new Map(members.map((m) => [m.email.toLowerCase(), m.id]));
+
+    hubstaffRows = teamMembers
+      .map((member) => {
+        const hubstaffId = emailToHubstaffId.get(member.email.toLowerCase());
+        if (!hubstaffId) return null;
+
+        const activity = dailyActivity.find((a) => a.userId === hubstaffId);
+        const apps = appUsage
+          .filter((a) => a.userId === hubstaffId)
+          .sort((a, b) => b.seconds - a.seconds)
+          .slice(0, 5)
+          .map((a) => ({ appName: a.appName, minutes: Math.round(a.seconds / 60) }));
+
+        return {
+          member,
+          trackedMinutes: Math.round((activity?.trackedSeconds ?? 0) / 60),
+          keyboardPercent: activity?.keyboardPercent ?? 0,
+          mousePercent: activity?.mousePercent ?? 0,
+          topApps: apps,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Attendance</h1>
         <p className="text-sm text-gray-500">
-          Shift 10:00 AM – 4:00 PM · 1-hour break cap · idle stretches over 5 minutes are flagged.
+          Shift 10:00 AM – 4:00 PM IST · 1-hour break cap · idle stretches over 5 minutes are
+          flagged (based on activity inside this app).
         </p>
       </div>
 
@@ -130,12 +187,12 @@ export default async function AttendancePage({
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   {row.clockInAt
-                    ? row.clockInAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    ? row.clockInAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
                     : '—'}
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   {row.clockOutAt
-                    ? row.clockOutAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    ? row.clockOutAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
                     : '—'}
                 </td>
                 <td className="px-4 py-3">
@@ -166,6 +223,61 @@ export default async function AttendancePage({
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-gray-900">
+            Real activity &amp; app usage <span className="text-gray-400">(via Hubstaff)</span>
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            This app can only see activity inside its own browser tab. App usage and true
+            system-wide idle time come from Hubstaff's desktop agent, installed separately on each
+            computer.
+          </p>
+        </div>
+
+        {!hubstaffEnabled ? (
+          <div className="px-4 py-6 text-sm text-gray-500">
+            Not connected yet. Add <code className="rounded bg-gray-100 px-1 py-0.5">HUBSTAFF_ORG_ACCESS_TOKEN</code>{' '}
+            and <code className="rounded bg-gray-100 px-1 py-0.5">HUBSTAFF_ORGANIZATION_ID</code> to your
+            environment variables to enable this.
+          </div>
+        ) : hubstaffRows.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-gray-500">
+            No matching Hubstaff activity found for this date — make sure each employee's Hubstaff
+            account uses the same email as their login here.
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Employee</th>
+                <th className="px-4 py-3">Tracked time</th>
+                <th className="px-4 py-3">Keyboard / mouse activity</th>
+                <th className="px-4 py-3">Top apps used</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {hubstaffRows.map((row) => (
+                <tr key={row.member.id}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{row.member.name}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {Math.floor(row.trackedMinutes / 60)}h {row.trackedMinutes % 60}m
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {row.keyboardPercent}% / {row.mousePercent}%
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {row.topApps.length === 0
+                      ? '—'
+                      : row.topApps.map((a) => `${a.appName} (${a.minutes}m)`).join(', ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

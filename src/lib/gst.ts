@@ -82,10 +82,21 @@ export function getFinancialYearRange(date: Date = new Date()): { start: Date; e
  * `existingCountInFY` should be the number of invoices already created in
  * the current Indian financial year (the caller queries this from the DB).
  */
-export function generateInvoiceNo(existingCountInFY: number, date: Date = new Date()): string {
+/** Derives a short invoice-number prefix from an organization's name, e.g. "Acme Pvt Ltd" -> "ACM". */
+export function getInvoicePrefix(organizationName: string): string {
+  const cleaned = organizationName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  return (cleaned.slice(0, 3) || 'INV');
+}
+
+export function generateInvoiceNo(
+  existingCountInFY: number,
+  organizationName: string,
+  date: Date = new Date()
+): string {
   const fy = getFinancialYearLabel(date);
   const seq = String(existingCountInFY + 1).padStart(3, '0');
-  return `AMX/${fy}/${seq}`;
+  const prefix = getInvoicePrefix(organizationName);
+  return `${prefix}/${fy}/${seq}`;
 }
 
 /** Basic structural validation for a 15-character Indian GSTIN. */

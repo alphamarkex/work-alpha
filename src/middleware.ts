@@ -15,6 +15,9 @@ export const config = {
     '/tickets/:path*',
     '/attendance/:path*',
     '/leads/:path*',
+    '/client-portal/:path*',
+    '/holidays/:path*',
+    '/leaves/:path*',
     '/api/employees/:path*',
     '/api/clients/:path*',
     '/api/invoices/:path*',
@@ -30,5 +33,7 @@ export const config = {
     '/api/salary-slip/:path*',
     '/api/attendance/:path*',
     '/api/leads/:path*',
+    '/api/holidays/:path*',
+    '/api/leaves/:path*',
   ],
 };

@@ -38,6 +38,10 @@ export default async function ProfileSetupPage() {
             aadharNumber: profile?.aadharNumber,
             hasIdDocument: Boolean(profile?.idDocumentName),
             idDocumentName: profile?.idDocumentName,
+            bankAccountHolderName: profile?.bankAccountHolderName,
+            bankAccountNumber: profile?.bankAccountNumber,
+            bankIfsc: profile?.bankIfsc,
+            bankName: profile?.bankName,
           }}
           mode="setup"
         />

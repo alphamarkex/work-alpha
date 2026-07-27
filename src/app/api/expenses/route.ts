@@ -36,6 +36,7 @@ export async function GET() {
   }
 
   const expenses = await prisma.expense.findMany({
+    where: { addedBy: { organizationId: session.user.organizationId } },
     include: { addedBy: { select: { id: true, name: true } } },
     orderBy: { expenseDate: 'desc' },
   });
@@ -89,6 +90,14 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'Missing expense id' }, { status: 400 });
+  }
+
+  const expense = await prisma.expense.findUnique({
+    where: { id },
+    include: { addedBy: true },
+  });
+  if (!expense || expense.addedBy.organizationId !== session.user.organizationId) {
+    return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
   }
 
   await prisma.expense.delete({ where: { id } });

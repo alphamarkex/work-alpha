@@ -13,6 +13,10 @@ interface ProfileData {
   aadharNumber?: string | null;
   hasIdDocument?: boolean;
   idDocumentName?: string | null;
+  bankAccountHolderName?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  bankName?: string | null;
 }
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -45,6 +49,10 @@ export default function ProfileForm({
     initial.emergencyContactPhone ?? ''
   );
   const [aadharNumber, setAadharNumber] = useState(initial.aadharNumber ?? '');
+  const [bankAccountHolderName, setBankAccountHolderName] = useState(initial.bankAccountHolderName ?? '');
+  const [bankAccountNumber, setBankAccountNumber] = useState(initial.bankAccountNumber ?? '');
+  const [bankIfsc, setBankIfsc] = useState(initial.bankIfsc ?? '');
+  const [bankName, setBankName] = useState(initial.bankName ?? '');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -91,6 +99,10 @@ export default function ProfileForm({
         emergencyContactName: emergencyContactName || null,
         emergencyContactPhone: emergencyContactPhone || null,
         aadharNumber: aadharNumber || null,
+        bankAccountHolderName: bankAccountHolderName || null,
+        bankAccountNumber: bankAccountNumber || null,
+        bankIfsc: bankIfsc || null,
+        bankName: bankName || null,
         idDocumentData,
         idDocumentName: documentFile?.name ?? null,
         idDocumentMimeType: documentFile?.type ?? null,
@@ -214,6 +226,51 @@ export default function ProfileForm({
             )}
           </div>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">
+          Bank details <span className="font-normal text-gray-400">(for salary payment)</span>
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Account holder name</label>
+            <input
+              value={bankAccountHolderName}
+              onChange={(e) => setBankAccountHolderName(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Bank name</label>
+            <input
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Account number</label>
+            <input
+              value={bankAccountNumber}
+              onChange={(e) => setBankAccountNumber(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">IFSC code</label>
+            <input
+              value={bankIfsc}
+              onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholder="e.g. HDFC0001234"
+              maxLength={11}
+            />
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-gray-400">
+          Only you and Founders can see this — used for processing your salary.
+        </p>
       </div>
 
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
